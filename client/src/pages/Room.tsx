@@ -4,7 +4,7 @@ import { SocketContext } from "../context/SocketContext";
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const socket = useContext(SocketContext);
+  const { socket, user } = useContext(SocketContext);
 
   const [copied, setCopied] = useState(false);
 
@@ -20,12 +20,12 @@ const Room: React.FC = () => {
   const [joined, setJoined] = useState(false);
 
   useEffect(() => {
-    if (!socket || !roomId) return;
+    if (!socket || !roomId || !user) return;
     if (!joined) {
-      socket.emit("joined-room", { roomId });
+      socket.emit("joined-room", { roomId: roomId, peerId: user?.id });
       setJoined(true); // mark as joined so we don't emit again
     }
-  }, [socket, roomId, joined]);
+  }, [socket, roomId, joined, user?.id]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 p-6">
