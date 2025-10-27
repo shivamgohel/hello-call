@@ -4,6 +4,7 @@ import http from "http";
 import { Server } from "socket.io";
 
 import { logger, serverConfig } from "./config";
+import roomHandler from "./handlers/RoomHandler";
 
 const app = express();
 const port = serverConfig.PORT;
@@ -24,6 +25,9 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
   logger.info(`New User connected: ${socket.id}`);
+
+  // Initialize room event handlers for this socket
+  roomHandler(socket);
 
   socket.on("disconnect", () => {
     logger.info(`User disconnected: ${socket.id}`);

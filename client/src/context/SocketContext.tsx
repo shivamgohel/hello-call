@@ -1,21 +1,32 @@
-import React, { createContext } from "react";
+import React, { createContext, useEffect } from "react";
 import { io, Socket } from "socket.io-client";
+import { useNavigate } from "react-router-dom";
 
 const WS_SERVER = "http://localhost:3000";
 
-// Create a socket instance
-const socket: Socket = io(WS_SERVER, {
-  transports: ["websocket"], // Ensures WebSocket connection
+// Create socket once globally
+const socket: Socket = io(WS_SERVER, { transports: ["websocket"] });
+
+socket.on("connect", () => {
+  console.log("Socket connected:", socket.id);
 });
 
-// Create context (socket or null)
-export const SocketContext = createContext<Socket | null>(null);
+export const SocketContext = createContext<Socket | null>(socket);
 
 interface Props {
   children: React.ReactNode;
 }
 
 export const SocketProvider: React.FC<Props> = ({ children }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const enterRoom = ({ roomId }: { roomId: string }) => {
+      navigate(`/room/${roomId}`);
+    };
+
+    socket.on("room-created", enterRoom);
+  }, []);
+
   return (
     <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>
   );
