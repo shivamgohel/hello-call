@@ -18,12 +18,14 @@ socket.on("connect", () => {
 interface ISocketContext {
   socket: Socket;
   user: Peer | null;
+  stream: MediaStream | null;
 }
 
 // Create context with default values
 export const SocketContext = createContext<ISocketContext>({
   socket,
   user: null,
+  stream: null,
 });
 
 interface Props {
@@ -34,6 +36,7 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
   const navigate = useNavigate();
 
   const [user, setUser] = useState<Peer | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   const fetchParticipants = ({
     roomId,
@@ -45,10 +48,21 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
     console.log(`Room ${roomId} has participants:`, participants);
   };
 
+  const fetchUserFeed = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    });
+    setStream(stream);
+  };
+
   useEffect(() => {
     const userId = uuidv4();
     const newPeer = new Peer(userId);
     setUser(newPeer);
+
+    // Fetch user media stream
+    fetchUserFeed();
 
     // Listen for room creation and navigate
     const enterRoom = ({ roomId }: { roomId: string }) => {
@@ -61,7 +75,7 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
   }, []);
 
   return (
-    <SocketContext.Provider value={{ socket, user }}>
+    <SocketContext.Provider value={{ socket, user, stream }}>
       {children}
     </SocketContext.Provider>
   );

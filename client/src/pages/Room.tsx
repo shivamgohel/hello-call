@@ -1,10 +1,11 @@
 import React, { useState, useContext, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { SocketContext } from "../context/SocketContext";
+import UserFeedPlayer from "../components/UserFeedPlayer";
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { socket, user } = useContext(SocketContext);
+  const { socket, user, stream } = useContext(SocketContext);
 
   const [copied, setCopied] = useState(false);
 
@@ -59,6 +60,15 @@ const Room: React.FC = () => {
       >
         {copied ? "Copied!" : "Copy Room Link"}
       </button>
+
+      {/* User video feed */}
+      <div className="mt-8">
+        {stream ? (
+          <UserFeedPlayer stream={stream} isMuted={true} label="You" />
+        ) : (
+          <p className="text-gray-500">🎥 Waiting for camera permission...</p>
+        )}
+      </div>
     </div>
   );
 };
