@@ -5,7 +5,7 @@ import UserFeedPlayer from "../components/UserFeedPlayer";
 
 const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { socket, user, stream } = useContext(SocketContext);
+  const { socket, user, stream, peers } = useContext(SocketContext);
 
   const [copied, setCopied] = useState(false);
 
@@ -17,16 +17,15 @@ const Room: React.FC = () => {
     setTimeout(() => setCopied(false), 10000);
   };
 
-  // Emit joined-room when component mounts
-  const [joined, setJoined] = useState(false);
-
   useEffect(() => {
-    if (!socket || !roomId || !user) return;
-    if (!joined) {
-      socket.emit("joined-room", { roomId: roomId, peerId: user?.id });
-      setJoined(true); // mark as joined so we don't emit again
+    // emitting this event so that either creator of room or joinee in the room
+    // anyone is added the server knows that new people have been added\
+    // to this room
+    if (user) {
+      console.log("New user with id", user.id, "has joined room", roomId);
+      socket.emit("joined-room", { roomId: roomId, peerId: user.id });
     }
-  }, [socket, roomId, joined, user?.id]);
+  }, [roomId, user, socket]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 p-6">
@@ -61,13 +60,45 @@ const Room: React.FC = () => {
         {copied ? "Copied!" : "Copy Room Link"}
       </button>
 
-      {/* User video feed */}
-      <div className="mt-8">
+      {/* Your Own Feed */}
+      <div className="mt-8 w-full max-w-md">
+        <h2 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-4 text-center">
+          Your Feed
+        </h2>
+
         {stream ? (
           <UserFeedPlayer stream={stream} isMuted={true} label="You" />
         ) : (
-          <p className="text-gray-500">🎥 Waiting for camera permission...</p>
+          <div className="flex justify-center items-center h-48 bg-gray-200 rounded-md">
+            <p className="text-gray-500">🎥 Waiting for camera permission...</p>
+          </div>
         )}
+      </div>
+
+      {/* Other Users Feed */}
+      <div className="mt-8 w-full">
+        <h2 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-4 text-center">
+          Other Participants
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {Object.keys(peers).filter((id) => id !== user?.id).length > 0 ? (
+            Object.keys(peers)
+              .filter((id) => id !== user?.id)
+              .map((peerId) => (
+                <UserFeedPlayer
+                  key={peerId}
+                  stream={peers[peerId]?.stream || null}
+                  isMuted={false}
+                  label={peerId}
+                />
+              ))
+          ) : (
+            <p className="text-gray-500 col-span-full text-center">
+              No other participants yet.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

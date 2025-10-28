@@ -1,31 +1,20 @@
 import React, { createContext, useEffect } from "react";
-import { io, Socket } from "socket.io-client";
+import SocketIoCient from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 import Peer from "peerjs";
 import { v4 as uuidv4 } from "uuid";
+import { peerReducer } from "../reduces/PeerReducer";
+import { addPeerAction } from "../actions/PeerAction";
 import { useState } from "react";
 
 const WS_SERVER = "http://localhost:3000";
 
-// Create socket once globally
-const socket: Socket = io(WS_SERVER, { transports: ["websocket"] });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const SocketContext = createContext<any | null>(null);
 
-socket.on("connect", () => {
-  console.log("Socket connected:", socket.id);
-});
-
-// Define context interface
-interface ISocketContext {
-  socket: Socket;
-  user: Peer | null;
-  stream: MediaStream | null;
-}
-
-// Create context with default values
-export const SocketContext = createContext<ISocketContext>({
-  socket,
-  user: null,
-  stream: null,
+const socket = SocketIoCient(WS_SERVER, {
+  withCredentials: false,
+  transports: ["polling", "websocket"],
 });
 
 interface Props {
@@ -37,6 +26,9 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
 
   const [user, setUser] = useState<Peer | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+
+  // peers will store peerId and their corresponding MediaStream
+  const [peers, dispatch] = React.useReducer(peerReducer, {});
 
   const fetchParticipants = ({
     roomId,
@@ -62,6 +54,7 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
       host: "localhost",
       port: 9000,
       path: "/myapp",
+      secure: false, // for local dev
     });
 
     setUser(newPeer);
@@ -76,11 +69,44 @@ export const SocketProvider: React.FC<Props> = ({ children }) => {
 
     socket.on("room-created", enterRoom);
 
-    socket.on("room-users", fetchParticipants);
+    socket.on("get-users", fetchParticipants);
+
+    // Cleanup on unmount
+    return () => {
+      newPeer.destroy(); // destroys Peer connection
+    };
   }, []);
 
+  useEffect(() => {
+    if (!user || !stream) return;
+
+    const handleUserJoined = ({ peerId }: { peerId: string }) => {
+      if (peerId === user.id) return;
+      const call = user.call(peerId, stream);
+      call.on("stream", (remoteStream) => {
+        dispatch(addPeerAction(peerId, remoteStream));
+      });
+    };
+
+    socket.on("user-joined", handleUserJoined);
+
+    user.on("call", (call) => {
+      if (call.peer === user.id) return;
+      call.answer(stream);
+      call.on("stream", (remoteStream) => {
+        dispatch(addPeerAction(call.peer, remoteStream));
+      });
+    });
+
+    socket.emit("ready");
+
+    return () => {
+      socket.off("user-joined", handleUserJoined);
+    };
+  }, [user, stream]);
+
   return (
-    <SocketContext.Provider value={{ socket, user, stream }}>
+    <SocketContext.Provider value={{ socket, user, stream, peers }}>
       {children}
     </SocketContext.Provider>
   );

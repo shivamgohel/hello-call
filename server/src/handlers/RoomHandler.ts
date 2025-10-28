@@ -14,27 +14,30 @@ const roomHandler = (socket: Socket) => {
     const roomId = uuidv4();
     socket.join(roomId);
 
-    logger.info(`Socket ${socket.id} created room: ${roomId}`);
+    rooms[roomId] = []; // create a new entry for the room
 
     socket.emit("room-created", { roomId });
+    logger.info(`Socket ${socket.id} created room: ${roomId}`);
   };
 
   // this event is fired when a peer joins a room
   const joinedRoom = ({ roomId, peerId }: IRoomParams) => {
-    if (!rooms[roomId]) {
-      rooms[roomId] = [];
+    if (rooms[roomId]) {
+      logger.info(`Peer ${peerId} is joining room: ${roomId}`);
+      rooms[roomId].push(peerId);
+
+      logger.info(`Current participants in room ${roomId}: ${rooms[roomId]}`);
+      socket.join(roomId);
+
+      socket.on("ready", () => {
+        socket.to(roomId).emit("user-joined", { peerId });
+      });
+
+      socket.emit("get-users", {
+        participants: rooms[roomId].filter((id) => id !== peerId),
+        roomId,
+      });
     }
-    rooms[roomId].push(peerId);
-    socket.join(roomId);
-
-    logger.info(
-      `Socket ${socket.id} joined room: ${roomId} with peer: ${peerId}`,
-    );
-
-    socket.emit("room-users", {
-      participants: rooms[roomId],
-      roomId,
-    });
   };
 
   socket.on("create-room", createRoom);
